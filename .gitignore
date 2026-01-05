@@ -1,3 +1,10 @@
 # Config local (NO versionar)
 src/main/resources/application-local.properties
 
+
+# IntelliJ
+.idea/
+*.iml
+
+# Maven
+target/
