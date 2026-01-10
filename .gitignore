@@ -8,3 +8,5 @@ src/main/resources/application-local.properties
 
 # Maven
 target/
+
+effective-pom.xml

@@ -2,7 +2,10 @@ package com.luis.recipes_web.controller;
 
 import com.luis.recipes_web.dominio.Recipe;
 import com.luis.recipes_web.dominio.RecipeTask;
+import com.luis.recipes_web.dto.recipetask.RecipeTaskRequestDTO;
+import com.luis.recipes_web.dto.recipetask.RecipeTaskResponseDTO;
 import com.luis.recipes_web.exception.NotFoundException;
+import com.luis.recipes_web.mapper.RecipeTaskMapper;
 import com.luis.recipes_web.service.RecipeTaskService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -10,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api")
@@ -21,53 +25,57 @@ public class RecipeTaskController {
         this.recipeTaskService = recipeTaskService;
     }
 
-    // =========================================================
-    // TAREAS POR RECETA
-    // =========================================================
-
     // GET /api/recipes/{idRecipe}/tasks
     @GetMapping("/recipes/{idRecipe}/tasks")
-    public ResponseEntity<List<RecipeTask>> getTasksByRecipe(@PathVariable Long idRecipe) {
-        List<RecipeTask> tasks = recipeTaskService.findByRecipeId(idRecipe);
-        return ResponseEntity.ok(tasks);
+    public ResponseEntity<List<RecipeTaskResponseDTO>> getTasksByRecipe(@PathVariable Long idRecipe) {
+
+        List<RecipeTaskResponseDTO> result = recipeTaskService.findByRecipeId(idRecipe)
+                .stream()
+                .map(RecipeTaskMapper::toResponse)
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(result);
     }
 
     // POST /api/recipes/{idRecipe}/tasks
     @PostMapping("/recipes/{idRecipe}/tasks")
-    public ResponseEntity<RecipeTask> createTaskForRecipe(
+    public ResponseEntity<RecipeTaskResponseDTO> createTaskForRecipe(
             @PathVariable Long idRecipe,
-            @Valid @RequestBody RecipeTask recipeTask
+            @Valid @RequestBody RecipeTaskRequestDTO request
     ) {
-        // Fuerzo que la task apunte a la recipe del path (no confío en lo que venga en el body)
         Recipe recipeRef = new Recipe();
         recipeRef.setIdRecipe(idRecipe);
-        recipeTask.setRecipe(recipeRef);
 
-        // usa el método específico para crear task bajo recipe (y valida existencia)
-        RecipeTask created = recipeTaskService.createForRecipe(idRecipe, recipeTask);
+        RecipeTask entity = RecipeTaskMapper.toEntity(request, recipeRef);
+        RecipeTask created = recipeTaskService.createForRecipe(idRecipe, entity);
 
-        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(RecipeTaskMapper.toResponse(created));
     }
 
     // GET /api/recipes/{idRecipe}/tasks/{idRecipeTask}
     @GetMapping("/recipes/{idRecipe}/tasks/{idRecipeTask}")
-    public ResponseEntity<RecipeTask> getTaskForRecipe(
+    public ResponseEntity<RecipeTaskResponseDTO> getTaskForRecipe(
             @PathVariable Long idRecipe,
             @PathVariable Long idRecipeTask
     ) {
         RecipeTask task = recipeTaskService.getForRecipe(idRecipe, idRecipeTask);
-        return ResponseEntity.ok(task);
+        return ResponseEntity.ok(RecipeTaskMapper.toResponse(task));
     }
 
     // PUT /api/recipes/{idRecipe}/tasks/{idRecipeTask}
     @PutMapping("/recipes/{idRecipe}/tasks/{idRecipeTask}")
-    public ResponseEntity<RecipeTask> updateTaskForRecipe(
+    public ResponseEntity<RecipeTaskResponseDTO> updateTaskForRecipe(
             @PathVariable Long idRecipe,
             @PathVariable Long idRecipeTask,
-            @Valid @RequestBody RecipeTask recipeTask
+            @Valid @RequestBody RecipeTaskRequestDTO request
     ) {
-        RecipeTask updated = recipeTaskService.updateForRecipe(idRecipe, idRecipeTask, recipeTask);
-        return ResponseEntity.ok(updated);
+        RecipeTask patch = new RecipeTask();
+        RecipeTaskMapper.updateEntity(patch, request);
+
+        RecipeTask updated = recipeTaskService.updateForRecipe(idRecipe, idRecipeTask, patch);
+
+        return ResponseEntity.ok(RecipeTaskMapper.toResponse(updated));
     }
 
     // DELETE /api/recipes/{idRecipe}/tasks/{idRecipeTask}
@@ -80,26 +88,28 @@ public class RecipeTaskController {
         return ResponseEntity.noContent().build();
     }
 
-    // =========================================================
-    // CRUD POR ID DE TASK (GLOBAL)
-    // =========================================================
-
     // GET /api/recipe-tasks/{id}
     @GetMapping("/recipe-tasks/{id}")
-    public ResponseEntity<RecipeTask> getById(@PathVariable Long id) {
+    public ResponseEntity<RecipeTaskResponseDTO> getById(@PathVariable Long id) {
+
         RecipeTask task = recipeTaskService.findById(id)
                 .orElseThrow(() -> new NotFoundException("RecipeTask no encontrada: id=" + id));
-        return ResponseEntity.ok(task);
+
+        return ResponseEntity.ok(RecipeTaskMapper.toResponse(task));
     }
 
     // PUT /api/recipe-tasks/{id}
     @PutMapping("/recipe-tasks/{id}")
-    public ResponseEntity<RecipeTask> update(
+    public ResponseEntity<RecipeTaskResponseDTO> update(
             @PathVariable Long id,
-            @Valid @RequestBody RecipeTask recipeTask
+            @Valid @RequestBody RecipeTaskRequestDTO request
     ) {
-        RecipeTask updated = recipeTaskService.update(id, recipeTask);
-        return ResponseEntity.ok(updated);
+        RecipeTask patch = new RecipeTask();
+        RecipeTaskMapper.updateEntity(patch, request);
+
+        RecipeTask updated = recipeTaskService.update(id, patch);
+
+        return ResponseEntity.ok(RecipeTaskMapper.toResponse(updated));
     }
 
     // DELETE /api/recipe-tasks/{id}
@@ -111,7 +121,13 @@ public class RecipeTaskController {
 
     // GET /api/recipe-tasks
     @GetMapping("/recipe-tasks")
-    public ResponseEntity<List<RecipeTask>> getAll() {
-        return ResponseEntity.ok(recipeTaskService.findAll());
+    public ResponseEntity<List<RecipeTaskResponseDTO>> getAll() {
+
+        List<RecipeTaskResponseDTO> result = recipeTaskService.findAll()
+                .stream()
+                .map(RecipeTaskMapper::toResponse)
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(result);
     }
 }

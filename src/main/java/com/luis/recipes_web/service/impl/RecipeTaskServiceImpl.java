@@ -31,7 +31,8 @@ public class RecipeTaskServiceImpl implements RecipeTaskService {
 
     @Override
     public RecipeTask create(RecipeTask recipeTask) {
-        validarRecipeObligatoria(recipeTask);
+        validarRecipeObligatoriaYActiva(recipeTask);
+        validarOrdenUnicoEnRecipe(recipeTask.getRecipe().getIdRecipe(), recipeTask.getOrden(), null);
         return recipeTaskRepository.save(recipeTask);
     }
 
@@ -47,7 +48,15 @@ public class RecipeTaskServiceImpl implements RecipeTaskService {
         Recipe recipe = recipeRepository.findById(idRecipe)
                 .orElseThrow(() -> new NotFoundException("Recipe no encontrada: id=" + idRecipe));
 
+        // Regla: no permitir tareas si la Recipe está inactiva
+        if (recipe.getActiva() == null || !recipe.getActiva()) {
+            throw new IllegalArgumentException("Recipe inactiva: id=" + recipe.getIdRecipe());
+        }
+
         recipeTask.setRecipe(recipe);
+
+        validarOrdenUnicoEnRecipe(idRecipe, recipeTask.getOrden(), null);
+
         return recipeTaskRepository.save(recipeTask);
     }
 
@@ -65,7 +74,11 @@ public class RecipeTaskServiceImpl implements RecipeTaskService {
                 .orElseThrow(() -> new NotFoundException("RecipeTask no encontrada: id=" + idRecipeTask));
 
         copiarCamposEditables(recipeTask, existente);
-        validarRecipeObligatoria(existente);
+
+        validarRecipeObligatoriaYActiva(existente);
+
+        Long idRecipe = existente.getRecipe().getIdRecipe();
+        validarOrdenUnicoEnRecipe(idRecipe, existente.getOrden(), idRecipeTask);
 
         return recipeTaskRepository.save(existente);
     }
@@ -89,11 +102,17 @@ public class RecipeTaskServiceImpl implements RecipeTaskService {
         Recipe recipe = recipeRepository.findById(idRecipe)
                 .orElseThrow(() -> new NotFoundException("Recipe no encontrada: id=" + idRecipe));
 
+        // Regla: no permitir tareas si la Recipe está inactiva
+        if (recipe.getActiva() == null || !recipe.getActiva()) {
+            throw new IllegalArgumentException("Recipe inactiva: id=" + recipe.getIdRecipe());
+        }
+
         RecipeTask existente = buscarTaskDeRecipe(idRecipe, idRecipeTask);
 
-        // no permitir cambiar recipe desde el body
         copiarCamposEditablesSinRecipe(recipeTask, existente);
         existente.setRecipe(recipe);
+
+        validarOrdenUnicoEnRecipe(idRecipe, existente.getOrden(), idRecipeTask);
 
         return recipeTaskRepository.save(existente);
     }
@@ -162,12 +181,11 @@ public class RecipeTaskServiceImpl implements RecipeTaskService {
             throw new IllegalArgumentException("idRecipe es null");
         }
 
-        // ✅ NUEVO: validar que la recipe exista
         if (!recipeRepository.existsById(idRecipe)) {
             throw new NotFoundException("Recipe no encontrada: id=" + idRecipe);
         }
 
-        return recipeTaskRepository.findByRecipeIdRecipeOrderByOrdenAsc(idRecipe);
+        return recipeTaskRepository.findByRecipe_IdRecipeOrderByOrdenAsc(idRecipe);
     }
 
     @Override
@@ -191,7 +209,7 @@ public class RecipeTaskServiceImpl implements RecipeTaskService {
     // Privados
     // =======================
 
-    private void validarRecipeObligatoria(RecipeTask rt) {
+    private void validarRecipeObligatoriaYActiva(RecipeTask rt) {
         if (rt == null) {
             throw new IllegalArgumentException("RecipeTask es null");
         }
@@ -201,9 +219,28 @@ public class RecipeTaskServiceImpl implements RecipeTaskService {
             throw new IllegalArgumentException("RecipeTask debe tener Recipe (id_recipe) válido");
         }
 
-        boolean existe = recipeRepository.existsById(r.getIdRecipe());
-        if (!existe) {
-            throw new NotFoundException("Recipe no encontrada: id=" + r.getIdRecipe());
+        Recipe existente = recipeRepository.findById(r.getIdRecipe())
+                .orElseThrow(() -> new NotFoundException("Recipe no encontrada: id=" + r.getIdRecipe()));
+
+        if (existente.getActiva() == null || !existente.getActiva()) {
+            throw new IllegalArgumentException("Recipe inactiva: id=" + existente.getIdRecipe());
+        }
+    }
+
+    private void validarOrdenUnicoEnRecipe(Long idRecipe, Integer orden, Long idRecipeTaskActual) {
+        if (orden == null) {
+            throw new IllegalArgumentException("orden es null");
+        }
+
+        List<RecipeTask> tasks = recipeTaskRepository.findByRecipe_IdRecipeOrderByOrdenAsc(idRecipe);
+        boolean repetido = tasks.stream().anyMatch(t ->
+                t.getOrden() != null
+                        && t.getOrden().equals(orden)
+                        && (idRecipeTaskActual == null || !t.getIdRecipeTask().equals(idRecipeTaskActual))
+        );
+
+        if (repetido) {
+            throw new IllegalArgumentException("El orden " + orden + " ya existe para la Recipe id=" + idRecipe);
         }
     }
 
@@ -227,7 +264,6 @@ public class RecipeTaskServiceImpl implements RecipeTaskService {
     private void copiarCamposEditables(RecipeTask origen, RecipeTask destino) {
         if (origen == null) return;
 
-        // en update global permitís cambiar recipe
         destino.setRecipe(origen.getRecipe());
 
         destino.setIdProcess(origen.getIdProcess());
@@ -242,7 +278,6 @@ public class RecipeTaskServiceImpl implements RecipeTaskService {
     private void copiarCamposEditablesSinRecipe(RecipeTask origen, RecipeTask destino) {
         if (origen == null) return;
 
-        // NO tocar recipe acá
         destino.setIdProcess(origen.getIdProcess());
         destino.setIdProcessDescription(origen.getIdProcessDescription());
         destino.setIdDrawing(origen.getIdDrawing());

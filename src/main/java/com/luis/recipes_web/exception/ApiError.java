@@ -9,9 +9,13 @@ public class ApiError {
     private String error;
     private String message;
     private String path;
-    private Map<String, String> fieldErrors;
 
-    public ApiError() {}
+    // Antes: Map<String, String>
+    // Ahora: permite varios mensajes por campo sin pisarlos
+    private Map<String, String[]> fieldErrors;
+
+    public ApiError() {
+    }
 
     public ApiError(LocalDateTime timestamp, int status, String error, String message, String path) {
         this.timestamp = timestamp;
@@ -36,6 +40,6 @@ public class ApiError {
     public String getPath() { return path; }
     public void setPath(String path) { this.path = path; }
 
-    public Map<String, String> getFieldErrors() { return fieldErrors; }
-    public void setFieldErrors(Map<String, String> fieldErrors) { this.fieldErrors = fieldErrors; }
+    public Map<String, String[]> getFieldErrors() { return fieldErrors; }
+    public void setFieldErrors(Map<String, String[]> fieldErrors) { this.fieldErrors = fieldErrors; }
 }

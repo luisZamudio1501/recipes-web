@@ -1,6 +1,8 @@
 package com.luis.recipes_web.controller;
 
-import com.luis.recipes_web.dominio.Recipe;
+import com.luis.recipes_web.dto.recipe.RecipeRequestDTO;
+import com.luis.recipes_web.dto.recipe.RecipeResponseDTO;
+import com.luis.recipes_web.mapper.RecipeMapper;
 import com.luis.recipes_web.service.RecipeService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,38 +22,52 @@ public class RecipeController {
 
     // GET - listar todas
     @GetMapping
-    public ResponseEntity<List<Recipe>> getAll() {
-        return ResponseEntity.ok(recipeService.findAll());
+    public ResponseEntity<List<RecipeResponseDTO>> getAll() {
+
+        List<RecipeResponseDTO> result = recipeService.findAll()
+                .stream()
+                .map(RecipeMapper::toResponse)
+                .toList();
+
+        return ResponseEntity.ok(result);
     }
 
     // GET - obtener por ID
     @GetMapping("/{id}")
-    public ResponseEntity<Recipe> getById(@PathVariable("id") Long idRecipe) {
+    public ResponseEntity<RecipeResponseDTO> getById(
+            @PathVariable("id") Long idRecipe) {
+
         return recipeService.findById(idRecipe)
+                .map(RecipeMapper::toResponse)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     // POST - crear
     @PostMapping
-    public ResponseEntity<Recipe> create(@RequestBody Recipe recipe) {
-        Recipe created = recipeService.create(recipe);
-        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+    public ResponseEntity<RecipeResponseDTO> create(
+            @RequestBody RecipeRequestDTO request) {
+
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(RecipeMapper.toResponse(recipeService.create(request)));
     }
 
     // PUT - actualizar
     @PutMapping("/{id}")
-    public ResponseEntity<Recipe> update(
+    public ResponseEntity<RecipeResponseDTO> update(
             @PathVariable("id") Long idRecipe,
-            @RequestBody Recipe recipe
+            @RequestBody RecipeRequestDTO request
     ) {
-        Recipe updated = recipeService.update(idRecipe, recipe);
-        return ResponseEntity.ok(updated);
+        return ResponseEntity.ok(
+                RecipeMapper.toResponse(recipeService.update(idRecipe, request))
+        );
     }
 
     // DELETE - eliminar
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable("id") Long idRecipe) {
+    public ResponseEntity<Void> delete(
+            @PathVariable("id") Long idRecipe) {
+
         recipeService.delete(idRecipe);
         return ResponseEntity.noContent().build();
     }

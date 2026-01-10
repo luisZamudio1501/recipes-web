@@ -17,6 +17,7 @@ import java.time.LocalDateTime;
                 @Index(name = "idx_part_number_nombre", columnList = "nombre_part_number")
         }
 )
+
 public class PartNumber {
 
     @Id
@@ -91,10 +92,6 @@ public class PartNumber {
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
     }
-
-
-
-
 
     @PrePersist
     protected void onCreate() {

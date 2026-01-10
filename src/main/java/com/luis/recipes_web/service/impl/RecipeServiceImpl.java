@@ -2,6 +2,7 @@ package com.luis.recipes_web.service.impl;
 
 import com.luis.recipes_web.dominio.PartNumber;
 import com.luis.recipes_web.dominio.Recipe;
+import com.luis.recipes_web.dto.recipe.RecipeRequestDTO;
 import com.luis.recipes_web.exception.NotFoundException;
 import com.luis.recipes_web.repositorio.PartNumberRepository;
 import com.luis.recipes_web.repositorio.RecipeRepository;
@@ -26,18 +27,25 @@ public class RecipeServiceImpl implements RecipeService {
     }
 
     @Override
-    public Recipe create(Recipe recipe) {
-        validarPartNumberObligatorio(recipe);
+    public Recipe create(RecipeRequestDTO request) {
+        Recipe recipe = new Recipe();
+        copiarCamposEditables(request, recipe);
+
+        // Regla: PartNumber obligatorio + existente + activo
+        validarPartNumberObligatorioYActivo(recipe);
+
         return recipeRepository.save(recipe);
     }
 
     @Override
-    public Recipe update(Long idRecipe, Recipe recipe) {
+    public Recipe update(Long idRecipe, RecipeRequestDTO request) {
         Recipe existente = recipeRepository.findById(idRecipe)
                 .orElseThrow(() -> new NotFoundException("Recipe no encontrada: id=" + idRecipe));
 
-        copiarCamposEditables(recipe, existente);
-        validarPartNumberObligatorio(existente);
+        copiarCamposEditables(request, existente);
+
+        // Regla: PartNumber obligatorio + existente + activo
+        validarPartNumberObligatorioYActivo(existente);
 
         return recipeRepository.save(existente);
     }
@@ -48,7 +56,6 @@ public class RecipeServiceImpl implements RecipeService {
                 .orElseThrow(() -> new NotFoundException("Recipe no encontrada: id=" + idRecipe));
         recipeRepository.delete(existente);
     }
-
 
     @Override
     @Transactional(readOnly = true)
@@ -62,12 +69,11 @@ public class RecipeServiceImpl implements RecipeService {
         return recipeRepository.findByIdWithPartNumber(idRecipe);
     }
 
-
     // =======================
     // Métodos privados
     // =======================
 
-    private void validarPartNumberObligatorio(Recipe recipe) {
+    private void validarPartNumberObligatorioYActivo(Recipe recipe) {
         if (recipe == null) {
             throw new IllegalArgumentException("Recipe es null");
         }
@@ -77,23 +83,31 @@ public class RecipeServiceImpl implements RecipeService {
             throw new IllegalArgumentException("Recipe debe tener PartNumber (id_part) válido");
         }
 
-        boolean existe = partNumberRepository.existsById(pn.getIdPart());
-        if (!existe) {
-            throw new NotFoundException("PartNumber no encontrado: id=" + pn.getIdPart());
+        PartNumber existente = partNumberRepository.findById(pn.getIdPart())
+                .orElseThrow(() -> new NotFoundException("PartNumber no encontrado: id=" + pn.getIdPart()));
+
+        // Regla: no permitir asociar a un PartNumber inactivo
+        // (asumo que en PartNumber el campo es Boolean activo con getter getActivo())
+        if (existente.getActivo() == null || !existente.getActivo()) {
+            throw new IllegalArgumentException("PartNumber inactivo: id=" + existente.getIdPart());
         }
     }
 
-    private void copiarCamposEditables(Recipe origen, Recipe destino) {
+    private void copiarCamposEditables(RecipeRequestDTO origen, Recipe destino) {
         if (origen == null) return;
 
-        // Campos editables según tu entidad
-        destino.setPartNumber(origen.getPartNumber());
+        // PartNumber "liviano" solo con idPart.
+        PartNumber pn = null;
+        if (origen.getIdPart() != null) {
+            pn = new PartNumber();
+            pn.setIdPart(origen.getIdPart());
+        }
+
+        destino.setPartNumber(pn);
         destino.setFechaCreacion(origen.getFechaCreacion());
         destino.setObservaciones(origen.getObservaciones());
         destino.setActiva(origen.getActiva());
 
-        // OJO: tasks se maneja con cuidado (por orphanRemoval/cascade)
-        // En Hito 2 no lo tocamos desde acá para evitar borrados accidentales.
-        // destino.setTasks(origen.getTasks());
+        // tasks no se tocan acá (por orphanRemoval/cascade).
     }
 }

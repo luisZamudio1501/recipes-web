@@ -1,6 +1,8 @@
 package com.luis.recipes_web.service.impl;
 
 import com.luis.recipes_web.dominio.PartNumber;
+import com.luis.recipes_web.exception.DuplicateException;
+import com.luis.recipes_web.exception.NotFoundException;
 import com.luis.recipes_web.repositorio.PartNumberRepository;
 import com.luis.recipes_web.service.PartNumberService;
 import org.springframework.stereotype.Service;
@@ -21,28 +23,42 @@ public class PartNumberServiceImpl implements PartNumberService {
 
     @Override
     public PartNumber create(PartNumber partNumber) {
+
+        // Regla de negocio: código único
+        String codigo = partNumber.getCodigoPartNumber();
+        if (partNumberRepository.findByCodigoPartNumber(codigo).isPresent()) {
+            throw new DuplicateException("Ya existe un PartNumber con codigoPartNumber: " + codigo);
+        }
+
         // createdAt/updatedAt/activo se manejan con @PrePersist en la entidad
         return partNumberRepository.save(partNumber);
     }
 
     @Override
     public PartNumber update(Long idPart, PartNumber partNumber) {
-        PartNumber existing = partNumberRepository.findById(idPart)
-                .orElseThrow(() -> new RuntimeException("PartNumber no encontrado: " + idPart));
 
-        // Campos existentes en tu entidad
+        PartNumber existing = partNumberRepository.findById(idPart)
+                .orElseThrow(() -> new NotFoundException("PartNumber no encontrado: " + idPart));
+
+        // Regla de negocio: si cambia el código, debe seguir siendo único
+        String nuevoCodigo = partNumber.getCodigoPartNumber();
+        partNumberRepository.findByCodigoPartNumber(nuevoCodigo).ifPresent(found -> {
+            if (!found.getIdPart().equals(idPart)) {
+                throw new DuplicateException("Ya existe un PartNumber con codigoPartNumber: " + nuevoCodigo);
+            }
+        });
+
         existing.setCodigoPartNumber(partNumber.getCodigoPartNumber());
         existing.setNombrePartNumber(partNumber.getNombrePartNumber());
         existing.setActivo(partNumber.getActivo());
 
-        // updatedAt se actualiza con @PreUpdate en la entidad
         return partNumberRepository.save(existing);
     }
 
     @Override
     public void delete(Long idPart) {
         PartNumber existing = partNumberRepository.findById(idPart)
-                .orElseThrow(() -> new RuntimeException("PartNumber no encontrado: " + idPart));
+                .orElseThrow(() -> new NotFoundException("PartNumber no encontrado: " + idPart));
         partNumberRepository.delete(existing);
     }
 
