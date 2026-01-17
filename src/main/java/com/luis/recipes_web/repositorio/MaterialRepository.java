@@ -1,4 +1,54 @@
 package com.luis.recipes_web.repositorio;
 
-public class MaterialRepository {
+import com.luis.recipes_web.dominio.Material;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.*;
+import org.springframework.data.repository.query.Param;
+
+import java.util.List;
+import java.util.Optional;
+
+public interface MaterialRepository extends JpaRepository<Material, Long> {
+
+    // === EXISTENTE ===
+    Optional<Material> findByCodigoMaterial(String codigoMaterial);
+
+    boolean existsByCodigoMaterial(String codigoMaterial);
+
+    // === HITO 7: SEARCH (lista filtrada, paginada) ===
+    @Query("""
+        SELECT m
+        FROM Material m
+        WHERE (:activo IS NULL OR m.activo = :activo)
+          AND (
+                :q IS NULL
+                OR LOWER(m.codigoMaterial) LIKE LOWER(CONCAT('%', :q, '%'))
+                OR LOWER(m.nombre) LIKE LOWER(CONCAT('%', :q, '%'))
+          )
+        ORDER BY m.codigoMaterial ASC, m.nombre ASC
+    """)
+    Page<Material> search(
+            @Param("activo") Boolean activo,
+            @Param("q") String q,
+            Pageable pageable
+    );
+
+    // === HITO 7: SUGGEST (autocompletado incremental) ===
+    @Query("""
+        SELECT m
+        FROM Material m
+        WHERE (:activo IS NULL OR m.activo = :activo)
+          AND (
+                :q IS NULL
+                OR LOWER(m.codigoMaterial) LIKE LOWER(CONCAT(:q, '%'))
+                OR LOWER(m.nombre) LIKE LOWER(CONCAT(:q, '%'))
+          )
+        ORDER BY m.codigoMaterial ASC, m.nombre ASC
+    """)
+    List<Material> suggest(
+            @Param("activo") Boolean activo,
+            @Param("q") String q,
+            Pageable pageable
+    );
 }

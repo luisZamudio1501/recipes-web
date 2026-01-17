@@ -7,6 +7,7 @@ import com.luis.recipes_web.exception.NotFoundException;
 import com.luis.recipes_web.repositorio.PartNumberRepository;
 import com.luis.recipes_web.repositorio.RecipeRepository;
 import com.luis.recipes_web.service.RecipeService;
+import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,6 +17,9 @@ import java.util.Optional;
 @Service
 @Transactional
 public class RecipeServiceImpl implements RecipeService {
+
+    private static final int MAX_PAGE_SIZE = 50;
+    private static final int MAX_SUGGEST_LIMIT = 10;
 
     private final RecipeRepository recipeRepository;
     private final PartNumberRepository partNumberRepository;
@@ -69,6 +73,61 @@ public class RecipeServiceImpl implements RecipeService {
         return recipeRepository.findByIdWithPartNumber(idRecipe);
     }
 
+    // =========================
+    // HITO 7: SEARCH + SUGGEST
+    // =========================
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<Recipe> search(Boolean activa, String q, Pageable pageable) {
+        String nq = normalize(q);
+
+        int requestedSize = pageable == null ? 20 : pageable.getPageSize();
+        int safeSize = Math.min(Math.max(requestedSize, 1), MAX_PAGE_SIZE);
+
+        int requestedPage = pageable == null ? 0 : pageable.getPageNumber();
+        int safePage = Math.max(requestedPage, 0);
+
+        Pageable fixed = PageRequest.of(
+                safePage,
+                safeSize,
+                Sort.by("idRecipe").ascending()
+        );
+
+        return recipeRepository.search(activa, nq, fixed);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<SuggestItem> suggest(Boolean activa, String q, Integer limit) {
+        String nq = normalize(q);
+
+        int lim = (limit == null) ? MAX_SUGGEST_LIMIT : Math.min(Math.max(limit, 1), MAX_SUGGEST_LIMIT);
+
+        Pageable topN = PageRequest.of(0, lim);
+
+        return recipeRepository.suggest(activa, nq, topN).stream()
+                .map(r -> {
+                    PartNumber pn = r.getPartNumber();
+                    String codigo = (pn != null ? pn.getCodigoPartNumber() : "");
+                    String nombre = (pn != null ? pn.getNombrePartNumber() : "");
+                    String label = codigo + " - " + nombre + " (Recipe " + r.getIdRecipe() + ")";
+                    return new SuggestItem(
+                            r.getIdRecipe(),
+                            label,
+                            codigo,
+                            r.getActiva()
+                    );
+                })
+                .toList();
+    }
+
+    private String normalize(String q) {
+        if (q == null) return null;
+        String t = q.trim().replaceAll("\\s+", " ");
+        return t.isEmpty() ? null : t;
+    }
+
     // =======================
     // Métodos privados
     // =======================
@@ -86,8 +145,6 @@ public class RecipeServiceImpl implements RecipeService {
         PartNumber existente = partNumberRepository.findById(pn.getIdPart())
                 .orElseThrow(() -> new NotFoundException("PartNumber no encontrado: id=" + pn.getIdPart()));
 
-        // Regla: no permitir asociar a un PartNumber inactivo
-        // (asumo que en PartNumber el campo es Boolean activo con getter getActivo())
         if (existente.getActivo() == null || !existente.getActivo()) {
             throw new IllegalArgumentException("PartNumber inactivo: id=" + existente.getIdPart());
         }
@@ -96,7 +153,6 @@ public class RecipeServiceImpl implements RecipeService {
     private void copiarCamposEditables(RecipeRequestDTO origen, Recipe destino) {
         if (origen == null) return;
 
-        // PartNumber "liviano" solo con idPart.
         PartNumber pn = null;
         if (origen.getIdPart() != null) {
             pn = new PartNumber();
@@ -107,7 +163,5 @@ public class RecipeServiceImpl implements RecipeService {
         destino.setFechaCreacion(origen.getFechaCreacion());
         destino.setObservaciones(origen.getObservaciones());
         destino.setActiva(origen.getActiva());
-
-        // tasks no se tocan acá (por orphanRemoval/cascade).
     }
 }
