@@ -4,7 +4,11 @@ import com.luis.recipes_web.dominio.PartNumber;
 import com.luis.recipes_web.dto.partnumber.PartNumberRequestDTO;
 import com.luis.recipes_web.dto.partnumber.PartNumberResponseDTO;
 
-public class PartNumberMapper {
+public final class PartNumberMapper {
+
+    private PartNumberMapper() {
+        // evita instanciación
+    }
 
     public static PartNumber toEntity(PartNumberRequestDTO dto) {
         PartNumber entity = new PartNumber();

@@ -6,6 +6,9 @@ import com.luis.recipes_web.dto.partnumber.PartNumberResponseDTO;
 import com.luis.recipes_web.mapper.PartNumberMapper;
 import com.luis.recipes_web.service.PartNumberService;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -22,17 +25,30 @@ public class PartNumberController {
         this.partNumberService = partNumberService;
     }
 
-    // GET - listar todos
+    // GET - búsqueda paginada (q + activo)
     @GetMapping
-    public ResponseEntity<List<PartNumberResponseDTO>> getAll() {
+    public ResponseEntity<Page<PartNumberResponseDTO>> search(
+            @RequestParam(required = false) Boolean activo,
+            @RequestParam(required = false) String q,
+            @PageableDefault(size = 20) Pageable pageable
+    ) {
+        Page<PartNumberResponseDTO> page =
+                partNumberService.search(activo, q, pageable)
+                        .map(PartNumberMapper::toResponse);
 
-        List<PartNumberResponseDTO> result =
-                partNumberService.findAll()
-                        .stream()
-                        .map(PartNumberMapper::toResponse)
-                        .toList();
+        return ResponseEntity.ok(page);
+    }
 
-        return ResponseEntity.ok(result);
+    // GET - autocompletado incremental (suggest)
+    @GetMapping("/suggest")
+    public ResponseEntity<List<PartNumberService.SuggestItem>> suggest(
+            @RequestParam(required = false) Boolean activo,
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) Integer limit
+    ) {
+        return ResponseEntity.ok(
+                partNumberService.suggest(activo, q, limit)
+        );
     }
 
     // GET - obtener por ID
