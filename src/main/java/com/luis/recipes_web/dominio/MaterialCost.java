@@ -35,9 +35,6 @@ public class MaterialCost {
     @Column(name = "costo_unitario", nullable = false, precision = 18, scale = 6)
     private BigDecimal costoUnitario;
 
-    // La DB tiene DEFAULT 'ARS'. Si moneda llega null desde Java, la DB NO aplica el default:
-    // por eso en el Service seteamos ARS cuando venga vacía.
-    // Esto queda como documentación del contrato con la DB.
     @Column(name = "moneda", nullable = false, length = 3, columnDefinition = "char(3) default 'ARS'")
     private String moneda;
 
@@ -53,8 +50,6 @@ public class MaterialCost {
     @Column(name = "observacion", length = 255)
     private String observacion;
 
-    // Los setea la DB (DEFAULT/ON UPDATE). Evitamos que JPA intente escribirlos.
-    // Y marcamos que los genera la DB para que Hibernate pueda refrescarlos mejor.
     @Generated(GenerationTime.INSERT)
     @Column(name = "created_at", nullable = false, updatable = false, insertable = false)
     private LocalDateTime createdAt;

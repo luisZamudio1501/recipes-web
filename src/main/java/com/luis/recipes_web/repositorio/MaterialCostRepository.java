@@ -35,4 +35,21 @@ public interface MaterialCostRepository extends JpaRepository<MaterialCost, Long
                                  @Param("newDesde") LocalDate newDesde,
                                  @Param("newHasta") LocalDate newHasta,
                                  @Param("maxDate") LocalDate maxDate);
+
+    @Query("""
+    SELECT COUNT(mc)
+    FROM MaterialCost mc
+    WHERE mc.material.idMaterial = :idMaterial
+      AND mc.idMaterialCost <> :excludeId
+      AND mc.vigenciaDesde <= :newHasta
+      AND COALESCE(mc.vigenciaHasta, :maxDate) >= :newDesde
+    """)
+    long countOverlapsNormalizedExcludingId(
+            @Param("idMaterial") Long idMaterial,
+            @Param("excludeId") Long excludeId,
+            @Param("newDesde") LocalDate newDesde,
+            @Param("newHasta") LocalDate newHasta,
+            @Param("maxDate") LocalDate maxDate
+    );
+
 }

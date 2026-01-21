@@ -15,5 +15,7 @@ public interface MaterialCostService {
 
     void delete(Long idMaterialCost);
 
+    MaterialCostResponseDTO update(Long idMaterialCost, MaterialCostRequestDTO request);
+
 
 }

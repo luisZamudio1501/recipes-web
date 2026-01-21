@@ -11,10 +11,10 @@ import java.util.Optional;
 
 public interface PartNumberRepository extends JpaRepository<PartNumber, Long> {
 
-    // === EXISTENTE ===
     Optional<PartNumber> findByCodigoPartNumber(String codigoPartNumber);
 
-    // === HITO 7: SEARCH (lista filtrada, paginada) ===
+    boolean existsByCodigoPartNumber(String codigoPartNumber);
+
     @Query("""
         SELECT pn
         FROM PartNumber pn
@@ -24,7 +24,6 @@ public interface PartNumberRepository extends JpaRepository<PartNumber, Long> {
                 OR LOWER(pn.codigoPartNumber) LIKE LOWER(CONCAT('%', :q, '%'))
                 OR LOWER(pn.nombrePartNumber) LIKE LOWER(CONCAT('%', :q, '%'))
           )
-        ORDER BY pn.codigoPartNumber ASC, pn.nombrePartNumber ASC
     """)
     Page<PartNumber> search(
             @Param("activo") Boolean activo,
@@ -32,17 +31,14 @@ public interface PartNumberRepository extends JpaRepository<PartNumber, Long> {
             Pageable pageable
     );
 
-    // === HITO 7: SUGGEST (autocompletado incremental) ===
     @Query("""
         SELECT pn
         FROM PartNumber pn
         WHERE (:activo IS NULL OR pn.activo = :activo)
           AND (
-                :q IS NULL
-                OR LOWER(pn.codigoPartNumber) LIKE LOWER(CONCAT(:q, '%'))
+                LOWER(pn.codigoPartNumber) LIKE LOWER(CONCAT(:q, '%'))
                 OR LOWER(pn.nombrePartNumber) LIKE LOWER(CONCAT(:q, '%'))
           )
-        ORDER BY pn.codigoPartNumber ASC, pn.nombrePartNumber ASC
     """)
     List<PartNumber> suggest(
             @Param("activo") Boolean activo,

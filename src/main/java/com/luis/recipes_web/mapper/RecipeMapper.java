@@ -5,24 +5,29 @@ import com.luis.recipes_web.dominio.Recipe;
 import com.luis.recipes_web.dto.recipe.RecipeRequestDTO;
 import com.luis.recipes_web.dto.recipe.RecipeResponseDTO;
 
+import java.time.LocalDateTime;
+
 public class RecipeMapper {
 
+    // CREATE
     public static Recipe toEntity(RecipeRequestDTO dto, PartNumber partNumber) {
         Recipe entity = new Recipe();
         entity.setPartNumber(partNumber);
-        entity.setFechaCreacion(dto.getFechaCreacion());
+        entity.setFechaCreacion(LocalDateTime.now()); // backend
         entity.setObservaciones(dto.getObservaciones());
         entity.setActiva(dto.getActiva());
         return entity;
     }
 
+    // UPDATE
     public static void updateEntity(Recipe entity, RecipeRequestDTO dto, PartNumber partNumber) {
         entity.setPartNumber(partNumber);
-        entity.setFechaCreacion(dto.getFechaCreacion());
+        // NO tocar fechaCreacion en update
         entity.setObservaciones(dto.getObservaciones());
         entity.setActiva(dto.getActiva());
     }
 
+    // RESPONSE
     public static RecipeResponseDTO toResponse(Recipe entity) {
         RecipeResponseDTO dto = new RecipeResponseDTO();
         dto.setIdRecipe(entity.getIdRecipe());
@@ -36,7 +41,7 @@ public class RecipeMapper {
             dto.setNombrePartNumber(entity.getPartNumber().getNombrePartNumber());
         }
 
-        // IMPORTANTE: no tocar entity.getTasks() acá (LAZY).
+        // IMPORTANTE: no tocar tasks (LAZY)
         dto.setTaskCount(0);
 
         return dto;

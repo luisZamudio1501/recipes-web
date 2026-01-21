@@ -1,31 +1,44 @@
 package com.luis.recipes_web.service;
 
-import com.luis.recipes_web.dominio.PartNumber;
+import com.luis.recipes_web.dto.common.SuggestItemDTO;
+import com.luis.recipes_web.dto.partnumber.PartNumberRequestDTO;
+import com.luis.recipes_web.dto.partnumber.PartNumberResponseDTO;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 import java.util.List;
-import java.util.Optional;
 
 public interface PartNumberService {
 
-    PartNumber create(PartNumber partNumber);
+    // Límites estándar (alineado al patrón del sistema)
+    int MAX_PAGE_SIZE = 50;
+    int MAX_SUGGEST_LIMIT = 10;
 
-    PartNumber update(Long idPart, PartNumber partNumber);
+    // === CRUD ===
 
+    List<PartNumberResponseDTO> findAll();
+
+    PartNumberResponseDTO findById(Long idPart);
+
+    PartNumberResponseDTO findByCodigo(String codigoPartNumber);
+
+    PartNumberResponseDTO create(PartNumberRequestDTO request);
+
+    PartNumberResponseDTO update(Long idPart, PartNumberRequestDTO request);
+
+    /**
+     * Soft delete (uso normal): marca activo=false
+     */
     void delete(Long idPart);
 
-    Optional<PartNumber> findById(Long idPart);
-
-    Optional<PartNumber> findByCodigo(String codigoPartNumber);
-
-    List<PartNumber> findAll();
+    /**
+     * Hard delete (uso excepcional): borra físicamente
+     */
+    void hardDelete(Long idPart);
 
     // === HITO 7 ===
-    Page<PartNumber> search(Boolean activo, String q, Pageable pageable);
+    Page<PartNumberResponseDTO> search(Boolean activo, String q, Pageable pageable);
 
-    List<SuggestItem> suggest(Boolean activo, String q, Integer limit);
-
-    // DTO liviano para autocompletado
-    record SuggestItem(Long id, String label, String codigo, Boolean activo) {}
+    // === HITO 8 (standard suggest) ===
+    List<SuggestItemDTO> suggest(Boolean activo, String q, Integer limit);
 }

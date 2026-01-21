@@ -2,8 +2,11 @@ package com.luis.recipes_web.service.impl;
 
 import com.luis.recipes_web.dominio.PartNumber;
 import com.luis.recipes_web.dominio.Recipe;
+import com.luis.recipes_web.dto.common.SuggestItemDTO;
 import com.luis.recipes_web.dto.recipe.RecipeRequestDTO;
+import com.luis.recipes_web.dto.recipe.RecipeResponseDTO;
 import com.luis.recipes_web.exception.NotFoundException;
+import com.luis.recipes_web.mapper.RecipeMapper;
 import com.luis.recipes_web.repositorio.PartNumberRepository;
 import com.luis.recipes_web.repositorio.RecipeRepository;
 import com.luis.recipes_web.service.RecipeService;
@@ -12,7 +15,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Optional;
 
 @Service
 @Transactional
@@ -31,29 +33,30 @@ public class RecipeServiceImpl implements RecipeService {
     }
 
     @Override
-    public Recipe create(RecipeRequestDTO request) {
+    public RecipeResponseDTO create(RecipeRequestDTO request) {
         Recipe recipe = new Recipe();
         copiarCamposEditables(request, recipe);
 
-        // Regla: PartNumber obligatorio + existente + activo
-        validarPartNumberObligatorioYActivo(recipe);
+        validarPartNumberObligatorioYActivoYSetear(recipe);
 
-        return recipeRepository.save(recipe);
+        Recipe saved = recipeRepository.save(recipe);
+        return RecipeMapper.toResponse(saved);
     }
 
     @Override
-    public Recipe update(Long idRecipe, RecipeRequestDTO request) {
+    public RecipeResponseDTO update(Long idRecipe, RecipeRequestDTO request) {
         Recipe existente = recipeRepository.findById(idRecipe)
                 .orElseThrow(() -> new NotFoundException("Recipe no encontrada: id=" + idRecipe));
 
         copiarCamposEditables(request, existente);
 
-        // Regla: PartNumber obligatorio + existente + activo
-        validarPartNumberObligatorioYActivo(existente);
+        validarPartNumberObligatorioYActivoYSetear(existente);
 
-        return recipeRepository.save(existente);
+        Recipe saved = recipeRepository.save(existente);
+        return RecipeMapper.toResponse(saved);
     }
 
+    // HARD DELETE (físico)
     @Override
     public void delete(Long idRecipe) {
         Recipe existente = recipeRepository.findById(idRecipe)
@@ -61,48 +64,64 @@ public class RecipeServiceImpl implements RecipeService {
         recipeRepository.delete(existente);
     }
 
+    // BORRADO LOGICO
     @Override
-    @Transactional(readOnly = true)
-    public List<Recipe> findAll() {
-        return recipeRepository.findAllWithPartNumber();
+    public void deactivate(Long idRecipe) {
+        Recipe existente = recipeRepository.findById(idRecipe)
+                .orElseThrow(() -> new NotFoundException("Recipe no encontrada: id=" + idRecipe));
+
+        if (Boolean.FALSE.equals(existente.getActiva())) {
+            return;
+        }
+
+        existente.setActiva(false);
+        recipeRepository.save(existente);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Optional<Recipe> findById(Long idRecipe) {
-        return recipeRepository.findByIdWithPartNumber(idRecipe);
+    public RecipeResponseDTO findById(Long idRecipe) {
+        Recipe r = recipeRepository.findByIdWithPartNumber(idRecipe)
+                .orElseThrow(() -> new NotFoundException("Recipe no encontrada: id=" + idRecipe));
+        return RecipeMapper.toResponse(r);
     }
-
-    // =========================
-    // HITO 7: SEARCH + SUGGEST
-    // =========================
 
     @Override
     @Transactional(readOnly = true)
-    public Page<Recipe> search(Boolean activa, String q, Pageable pageable) {
+    public List<RecipeResponseDTO> findAll() {
+        return recipeRepository.findAllWithPartNumber()
+                .stream()
+                .map(RecipeMapper::toResponse)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<RecipeResponseDTO> search(Boolean activa, String q, Pageable pageable) {
         String nq = normalize(q);
 
-        int requestedSize = pageable == null ? 20 : pageable.getPageSize();
+        int requestedSize = (pageable == null) ? 20 : pageable.getPageSize();
         int safeSize = Math.min(Math.max(requestedSize, 1), MAX_PAGE_SIZE);
 
-        int requestedPage = pageable == null ? 0 : pageable.getPageNumber();
+        int requestedPage = (pageable == null) ? 0 : pageable.getPageNumber();
         int safePage = Math.max(requestedPage, 0);
 
-        Pageable fixed = PageRequest.of(
-                safePage,
-                safeSize,
-                Sort.by("idRecipe").ascending()
-        );
+        // sin sort acá (mejor ordenar en el @Query con ORDER BY)
+        Pageable fixed = PageRequest.of(safePage, safeSize);
 
-        return recipeRepository.search(activa, nq, fixed);
+        return recipeRepository.search(activa, nq, fixed)
+                .map(RecipeMapper::toResponse);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<SuggestItem> suggest(Boolean activa, String q, Integer limit) {
+    public List<SuggestItemDTO> suggest(Boolean activa, String q, Integer limit) {
         String nq = normalize(q);
+        if (nq == null) return List.of();
 
-        int lim = (limit == null) ? MAX_SUGGEST_LIMIT : Math.min(Math.max(limit, 1), MAX_SUGGEST_LIMIT);
+        int lim = (limit == null)
+                ? MAX_SUGGEST_LIMIT
+                : Math.min(Math.max(limit, 1), MAX_SUGGEST_LIMIT);
 
         Pageable topN = PageRequest.of(0, lim);
 
@@ -112,12 +131,8 @@ public class RecipeServiceImpl implements RecipeService {
                     String codigo = (pn != null ? pn.getCodigoPartNumber() : "");
                     String nombre = (pn != null ? pn.getNombrePartNumber() : "");
                     String label = codigo + " - " + nombre + " (Recipe " + r.getIdRecipe() + ")";
-                    return new SuggestItem(
-                            r.getIdRecipe(),
-                            label,
-                            codigo,
-                            r.getActiva()
-                    );
+                    String extra = codigo;
+                    return new SuggestItemDTO(r.getIdRecipe(), label, extra);
                 })
                 .toList();
     }
@@ -128,11 +143,7 @@ public class RecipeServiceImpl implements RecipeService {
         return t.isEmpty() ? null : t;
     }
 
-    // =======================
-    // Métodos privados
-    // =======================
-
-    private void validarPartNumberObligatorioYActivo(Recipe recipe) {
+    private void validarPartNumberObligatorioYActivoYSetear(Recipe recipe) {
         if (recipe == null) {
             throw new IllegalArgumentException("Recipe es null");
         }
@@ -145,9 +156,12 @@ public class RecipeServiceImpl implements RecipeService {
         PartNumber existente = partNumberRepository.findById(pn.getIdPart())
                 .orElseThrow(() -> new NotFoundException("PartNumber no encontrado: id=" + pn.getIdPart()));
 
-        if (existente.getActivo() == null || !existente.getActivo()) {
+        if (!Boolean.TRUE.equals(existente.getActivo())) {
             throw new IllegalArgumentException("PartNumber inactivo: id=" + existente.getIdPart());
         }
+
+        // clave: setear el PN real
+        recipe.setPartNumber(existente);
     }
 
     private void copiarCamposEditables(RecipeRequestDTO origen, Recipe destino) {

@@ -1,25 +1,27 @@
 package com.luis.recipes_web.dto.material;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 public class MaterialRequestDTO {
 
-    @NotBlank
-    @Size(max = 50)
+    @NotBlank(message = "codigoMaterial es obligatorio")
+    @Size(max = 50, message = "codigoMaterial debe tener como máximo 50 caracteres")
     private String codigoMaterial;
 
-    @NotBlank
-    @Size(max = 120)
+    @NotBlank(message = "nombreMaterial es obligatorio")
+    @Size(max = 120, message = "nombreMaterial debe tener como máximo 120 caracteres")
     private String nombreMaterial;
 
-    @NotBlank
-    @Size(max = 20)
+    @NotBlank(message = "unidadMedida es obligatorio")
+    @Size(max = 20, message = "unidadMedida debe tener como máximo 20 caracteres")
     private String unidadMedida;
 
-    @Size(max = 255)
+    @Size(max = 255, message = "descripcion debe tener como máximo 255 caracteres")
     private String descripcion;
 
+    @NotNull(message = "activo es obligatorio")
     private Boolean activo;
 
     public String getCodigoMaterial() { return codigoMaterial; }

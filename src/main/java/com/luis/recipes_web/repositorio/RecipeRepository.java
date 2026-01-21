@@ -12,7 +12,7 @@ import java.util.Optional;
 public interface RecipeRepository extends JpaRepository<Recipe, Long> {
 
     @Query("""
-           SELECT r
+           SELECT DISTINCT r
            FROM Recipe r
            JOIN FETCH r.partNumber
            """)
@@ -32,14 +32,13 @@ public interface RecipeRepository extends JpaRepository<Recipe, Long> {
     @Query("""
         SELECT r
         FROM Recipe r
-        JOIN FETCH r.partNumber pn
+        JOIN r.partNumber pn
         WHERE (:activa IS NULL OR r.activa = :activa)
           AND (
                 :q IS NULL
                 OR LOWER(pn.codigoPartNumber) LIKE LOWER(CONCAT('%', :q, '%'))
                 OR LOWER(pn.nombrePartNumber) LIKE LOWER(CONCAT('%', :q, '%'))
           )
-        ORDER BY pn.codigoPartNumber ASC, pn.nombrePartNumber ASC, r.idRecipe ASC
     """)
     Page<Recipe> search(
             @Param("activa") Boolean activa,
@@ -48,19 +47,18 @@ public interface RecipeRepository extends JpaRepository<Recipe, Long> {
     );
 
     // =========================
-    // HITO 7: SUGGEST (liviano)
+    // HITO 8: SUGGEST incremental
+    // (con fetch del PN para evitar N+1)
     // =========================
     @Query("""
-        SELECT r
+        SELECT DISTINCT r
         FROM Recipe r
         JOIN FETCH r.partNumber pn
         WHERE (:activa IS NULL OR r.activa = :activa)
           AND (
-                :q IS NULL
-                OR LOWER(pn.codigoPartNumber) LIKE LOWER(CONCAT(:q, '%'))
+                LOWER(pn.codigoPartNumber) LIKE LOWER(CONCAT(:q, '%'))
                 OR LOWER(pn.nombrePartNumber) LIKE LOWER(CONCAT(:q, '%'))
           )
-        ORDER BY pn.codigoPartNumber ASC, pn.nombrePartNumber ASC, r.idRecipe ASC
     """)
     List<Recipe> suggest(
             @Param("activa") Boolean activa,

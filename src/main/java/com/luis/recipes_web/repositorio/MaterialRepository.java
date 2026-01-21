@@ -11,12 +11,11 @@ import java.util.Optional;
 
 public interface MaterialRepository extends JpaRepository<Material, Long> {
 
-    // === EXISTENTE ===
     Optional<Material> findByCodigoMaterial(String codigoMaterial);
 
     boolean existsByCodigoMaterial(String codigoMaterial);
 
-    // === HITO 7: SEARCH (lista filtrada, paginada) ===
+    // === SEARCH (filtrado + paginado) ===
     @Query("""
         SELECT m
         FROM Material m
@@ -26,7 +25,6 @@ public interface MaterialRepository extends JpaRepository<Material, Long> {
                 OR LOWER(m.codigoMaterial) LIKE LOWER(CONCAT('%', :q, '%'))
                 OR LOWER(m.nombre) LIKE LOWER(CONCAT('%', :q, '%'))
           )
-        ORDER BY m.codigoMaterial ASC, m.nombre ASC
     """)
     Page<Material> search(
             @Param("activo") Boolean activo,
@@ -34,14 +32,13 @@ public interface MaterialRepository extends JpaRepository<Material, Long> {
             Pageable pageable
     );
 
-    // === HITO 7: SUGGEST (autocompletado incremental) ===
+    // === SUGGEST (autocompletado incremental) ===
     @Query("""
         SELECT m
         FROM Material m
         WHERE (:activo IS NULL OR m.activo = :activo)
           AND (
-                :q IS NULL
-                OR LOWER(m.codigoMaterial) LIKE LOWER(CONCAT(:q, '%'))
+                LOWER(m.codigoMaterial) LIKE LOWER(CONCAT(:q, '%'))
                 OR LOWER(m.nombre) LIKE LOWER(CONCAT(:q, '%'))
           )
         ORDER BY m.codigoMaterial ASC, m.nombre ASC

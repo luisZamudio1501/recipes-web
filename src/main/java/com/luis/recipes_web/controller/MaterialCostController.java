@@ -45,4 +45,14 @@ public class MaterialCostController {
         materialCostService.delete(idMaterialCost);
         return ResponseEntity.noContent().build();
     }
+
+    // PUT /api/material-costs/{idMaterialCost}
+    @PutMapping("/{idMaterialCost}")
+    public ResponseEntity<MaterialCostResponseDTO> update(
+            @PathVariable Long idMaterialCost,
+            @Valid @RequestBody MaterialCostRequestDTO request
+    ) {
+        return ResponseEntity.ok(materialCostService.update(idMaterialCost, request));
+    }
+
 }

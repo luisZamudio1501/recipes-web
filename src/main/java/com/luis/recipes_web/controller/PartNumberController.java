@@ -1,9 +1,8 @@
 package com.luis.recipes_web.controller;
 
-import com.luis.recipes_web.dominio.PartNumber;
+import com.luis.recipes_web.dto.common.SuggestItemDTO;
 import com.luis.recipes_web.dto.partnumber.PartNumberRequestDTO;
 import com.luis.recipes_web.dto.partnumber.PartNumberResponseDTO;
-import com.luis.recipes_web.mapper.PartNumberMapper;
 import com.luis.recipes_web.service.PartNumberService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
@@ -30,60 +29,38 @@ public class PartNumberController {
     public ResponseEntity<Page<PartNumberResponseDTO>> search(
             @RequestParam(required = false) Boolean activo,
             @RequestParam(required = false) String q,
-            @PageableDefault(size = 20) Pageable pageable
+            @PageableDefault(size = 20, sort = {"codigoPartNumber", "nombrePartNumber"}) Pageable pageable
     ) {
-        Page<PartNumberResponseDTO> page =
-                partNumberService.search(activo, q, pageable)
-                        .map(PartNumberMapper::toResponse);
-
-        return ResponseEntity.ok(page);
+        return ResponseEntity.ok(partNumberService.search(activo, q, pageable));
     }
 
     // GET - autocompletado incremental (suggest)
     @GetMapping("/suggest")
-    public ResponseEntity<List<PartNumberService.SuggestItem>> suggest(
+    public ResponseEntity<List<SuggestItemDTO>> suggest(
             @RequestParam(required = false) Boolean activo,
             @RequestParam(required = false) String q,
             @RequestParam(required = false) Integer limit
     ) {
-        return ResponseEntity.ok(
-                partNumberService.suggest(activo, q, limit)
-        );
+        return ResponseEntity.ok(partNumberService.suggest(activo, q, limit));
     }
 
     // GET - obtener por ID
     @GetMapping("/{id}")
-    public ResponseEntity<PartNumberResponseDTO> getById(
-            @PathVariable("id") Long idPart) {
-
-        return partNumberService.findById(idPart)
-                .map(PartNumberMapper::toResponse)
-                .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+    public ResponseEntity<PartNumberResponseDTO> getById(@PathVariable("id") Long idPart) {
+        return ResponseEntity.ok(partNumberService.findById(idPart));
     }
 
     // GET - obtener por código
     @GetMapping("/by-codigo/{codigo}")
-    public ResponseEntity<PartNumberResponseDTO> getByCodigo(
-            @PathVariable("codigo") String codigoPartNumber) {
-
-        return partNumberService.findByCodigo(codigoPartNumber)
-                .map(PartNumberMapper::toResponse)
-                .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+    public ResponseEntity<PartNumberResponseDTO> getByCodigo(@PathVariable("codigo") String codigoPartNumber) {
+        return ResponseEntity.ok(partNumberService.findByCodigo(codigoPartNumber));
     }
 
     // POST - crear
     @PostMapping
-    public ResponseEntity<PartNumberResponseDTO> create(
-            @Valid @RequestBody PartNumberRequestDTO request) {
-
-        PartNumber entity = PartNumberMapper.toEntity(request);
-        PartNumber created = partNumberService.create(entity);
-
-        return ResponseEntity
-                .status(HttpStatus.CREATED)
-                .body(PartNumberMapper.toResponse(created));
+    public ResponseEntity<PartNumberResponseDTO> create(@Valid @RequestBody PartNumberRequestDTO request) {
+        PartNumberResponseDTO created = partNumberService.create(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     // PUT - actualizar
@@ -92,20 +69,20 @@ public class PartNumberController {
             @PathVariable("id") Long idPart,
             @Valid @RequestBody PartNumberRequestDTO request
     ) {
-        PartNumber entity = PartNumberMapper.toEntity(request);
-        PartNumber updated = partNumberService.update(idPart, entity);
-
-        return ResponseEntity.ok(
-                PartNumberMapper.toResponse(updated)
-        );
+        return ResponseEntity.ok(partNumberService.update(idPart, request));
     }
 
-    // DELETE - eliminar
+    // DELETE - SOFT delete (marca activo=false)
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(
-            @PathVariable("id") Long idPart) {
-
+    public ResponseEntity<Void> delete(@PathVariable("id") Long idPart) {
         partNumberService.delete(idPart);
+        return ResponseEntity.noContent().build();
+    }
+
+    // DELETE - HARD delete (uso excepcional)
+    @DeleteMapping("/{id}/hard")
+    public ResponseEntity<Void> hardDelete(@PathVariable("id") Long idPart) {
+        partNumberService.hardDelete(idPart);
         return ResponseEntity.noContent().build();
     }
 }

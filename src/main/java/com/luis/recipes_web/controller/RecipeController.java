@@ -1,9 +1,9 @@
 package com.luis.recipes_web.controller;
 
+import com.luis.recipes_web.dto.common.SuggestItemDTO;
 import com.luis.recipes_web.dto.recipe.RecipeRequestDTO;
 import com.luis.recipes_web.dto.recipe.RecipeResponseDTO;
 import com.luis.recipes_web.dto.recipematerial.RecipeMaterialResponseDTO;
-import com.luis.recipes_web.mapper.RecipeMapper;
 import com.luis.recipes_web.service.RecipeMaterialService;
 import com.luis.recipes_web.service.RecipeService;
 import jakarta.validation.Valid;
@@ -39,33 +39,23 @@ public class RecipeController {
             @RequestParam(required = false) String q,
             @PageableDefault(size = 20) Pageable pageable
     ) {
-        Page<RecipeResponseDTO> page =
-                recipeService.search(activa, q, pageable)
-                        .map(RecipeMapper::toResponse);
-
-        return ResponseEntity.ok(page);
+        return ResponseEntity.ok(recipeService.search(activa, q, pageable));
     }
 
     // GET - autocompletado incremental (suggest)
-    // Ej: /api/recipes/suggest?q=304&limit=10&activa=true
     @GetMapping("/suggest")
-    public ResponseEntity<List<RecipeService.SuggestItem>> suggest(
+    public ResponseEntity<List<SuggestItemDTO>> suggest(
             @RequestParam(required = false) Boolean activa,
             @RequestParam(required = false) String q,
             @RequestParam(required = false) Integer limit
     ) {
-        return ResponseEntity.ok(
-                recipeService.suggest(activa, q, limit)
-        );
+        return ResponseEntity.ok(recipeService.suggest(activa, q, limit));
     }
 
     // GET - obtener por ID
     @GetMapping("/{id}")
     public ResponseEntity<RecipeResponseDTO> getById(@PathVariable("id") Long idRecipe) {
-        return recipeService.findById(idRecipe)
-                .map(RecipeMapper::toResponse)
-                .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+        return ResponseEntity.ok(recipeService.findById(idRecipe));
     }
 
     // GET - listar materiales de una receta
@@ -79,8 +69,8 @@ public class RecipeController {
     // POST - crear
     @PostMapping
     public ResponseEntity<RecipeResponseDTO> create(@Valid @RequestBody RecipeRequestDTO request) {
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(RecipeMapper.toResponse(recipeService.create(request)));
+        RecipeResponseDTO created = recipeService.create(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     // PUT - actualizar
@@ -89,14 +79,19 @@ public class RecipeController {
             @PathVariable("id") Long idRecipe,
             @Valid @RequestBody RecipeRequestDTO request
     ) {
-        return ResponseEntity.ok(
-                RecipeMapper.toResponse(recipeService.update(idRecipe, request))
-        );
+        return ResponseEntity.ok(recipeService.update(idRecipe, request));
     }
 
-    // DELETE - eliminar
+    // DELETE - borrado lógico (activa=false)
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable("id") Long idRecipe) {
+    public ResponseEntity<Void> deactivate(@PathVariable("id") Long idRecipe) {
+        recipeService.deactivate(idRecipe);
+        return ResponseEntity.noContent().build();
+    }
+
+    // DELETE - borrado físico (uso excepcional)
+    @DeleteMapping("/{id}/hard")
+    public ResponseEntity<Void> hardDelete(@PathVariable("id") Long idRecipe) {
         recipeService.delete(idRecipe);
         return ResponseEntity.noContent().build();
     }
